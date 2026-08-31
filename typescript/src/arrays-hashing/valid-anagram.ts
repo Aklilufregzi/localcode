@@ -10,8 +10,6 @@
  */
 
 export function isAnagram(s: string, t: string): boolean {
-  // TODO: implement
-  throw new Error("Not implemented");
 }
 
 // Quick manual run / debugging playground — runs only when executed directly.

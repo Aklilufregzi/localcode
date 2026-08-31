@@ -24,6 +24,17 @@ npm run dev
 
 Open `http://localhost:3000`. Choose a problem, edit its Python or TypeScript solution, and click **Run tests**. The editor saves directly to the existing exercise file before running its focused local test suite.
 
+### AI Roast Mode
+
+Keep the Anthropic key local—do not paste it into the browser or commit it:
+
+```bash
+cd web
+cp .env.example .env
+```
+
+Open `web/.env`, replace the placeholder with your key, and restart `npm run dev`. Turn on **🔥 AI** above the editor. After you pause typing, the coach reviews the code line by line with technical praise, playful roasts, and hints. Identical code reviews are cached to reduce API usage.
+
 ## Layout
 
 ```

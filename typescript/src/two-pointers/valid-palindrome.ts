@@ -12,7 +12,7 @@
 
 export function isPalindrome(s: string): boolean {
   // TODO: implement
-  throw new Error("Not implemented");
+ console.log("hello")
 }
 
 // Quick manual run / debugging playground — runs only when executed directly.
