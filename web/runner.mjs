@@ -56,8 +56,10 @@ function metadata(source,language){
 
 function exampleTests(source,language){
   const examples=[];
-  if(language==='python'){const pattern=/def (test_[^(]+)\(\):\n([\s\S]*?)(?=\n\ndef test_|\n\nif __name__|$)/g;let match;while((match=pattern.exec(source))&&examples.length<5)examples.push({name:pretty(match[1].replace(/^test_/,'')),code:match[2].split('\n').map(line=>line.replace(/^    /,'')).join('\n').trim().slice(0,700)})}
-  else {const parts=source.split(/\n\s*it\(/).slice(1,6);for(const part of parts){const name=part.match(/^['"]([^'"]+)/)?.[1]??'Test case';const body=part.slice(part.indexOf('=>')+2).replace(/^\s*\{\s*/,'').replace(/\}\);[\s\S]*$/,'').trim();examples.push({name,code:body.slice(0,700)})}}
+  const friendly=value=>value.trim().replace(/\bTrue\b/g,'true').replace(/\bFalse\b/g,'false').replace(/\bNone\b/g,'null');
+  const fromAssertion=(body,name)=>{const assertion=body.split('\n').map(line=>line.trim()).filter(Boolean).join(' ');const match=assertion.match(/^assert\s+(.+?)\s+(==|is|in)\s+(.+)$/);if(!match)return{name,code:body.trim().slice(0,700)};const callable=match[1].replace(/^Solution\(\)\./,'');const call=callable.match(/^[A-Za-z_]\w*\((.*)\)$/);if(!call)return{name,code:body.trim().slice(0,700)};let output=friendly(match[3]);if(match[2]==='in'&&output.startsWith('{')&&output.endsWith('}'))output=output.slice(1,-1).split(',').map(value=>value.trim()).join(' or ');return{name,input:friendly(call[1])||'No input',output}}
+  if(language==='python'){const pattern=/def (test_[^(]+)\(\):\n([\s\S]*?)(?=\n\ndef test_|\n\nif __name__|$)/g;let match;while((match=pattern.exec(source))&&examples.length<5){const body=match[2].split('\n').map(line=>line.replace(/^    /,'')).join('\n').trim();examples.push(fromAssertion(body,pretty(match[1].replace(/^test_/,''))))}}
+  else {const parts=source.split(/\n\s*it\(/).slice(1,6);for(const part of parts){const name=part.match(/^['"]([^'"]+)/)?.[1]??'Test case';const body=part.slice(part.indexOf('=>')+2).replace(/^\s*\{\s*/,'').replace(/\}\);[\s\S]*$/,'').trim();const flat=body.replace(/\s+/g,' ');const expectStart=flat.indexOf('expect(');const matcher=flat.match(/\)\.(?:toEqual|toBe)\(/);if(expectStart>=0&&matcher?.index!=null){const actual=flat.slice(expectStart+7,matcher.index);const call=actual.match(/^[A-Za-z_$]\w*\((.*)\)$/);const expected=flat.slice(matcher.index+matcher[0].length).replace(/\);?\s*$/,'');examples.push({name,input:friendly(call?.[1]??actual),output:friendly(expected)})}else examples.push({name,code:body.slice(0,700)})}}
   return examples;
 }
 
