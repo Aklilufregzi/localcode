@@ -11,7 +11,10 @@ const ROOT = path.resolve(WEB, '..');
 const PORT = 4311;
 const PROGRESS_FILE = path.join(ROOT,'.localcode-progress.json');
 const testMarker = '# ---------------------------- tests ----------------------------';
-const pretty = value => value.split(/[-_]/).map(word => word ? word[0].toUpperCase()+word.slice(1) : '').join(' ');
+const topicNames={'1d-dp':'1-D Dynamic Programming','2d-dp':'2-D Dynamic Programming','advanced-graphs':'Advanced Graphs','arrays-hashing':'Arrays & Hashing','binary-search':'Binary Search','bit-manipulation':'Bit Manipulation','linked-list':'Linked List','math-geometry':'Math & Geometry','sliding-window':'Sliding Window','two-pointers':'Two Pointers'};
+const pretty = value => topicNames[value]??value.split(/[-_]/).map(word => word ? word[0].toUpperCase()+word.slice(1) : '').join(' ');
+const canonicalTopic = value => ({one_d_dp:'1d-dp',two_d_dp:'2d-dp'}[value]??value.replaceAll('_','-'));
+const canonicalName = value => value.replaceAll('_','-')==='3sum'?'three-sum':value.replaceAll('_','-');
 const reviewCache = new Map();
 
 async function walk(base, extension) {
@@ -29,8 +32,7 @@ async function catalog() {
   let progress={}; try{progress=JSON.parse(await fs.readFile(PROGRESS_FILE,'utf8'))}catch{}
   const map = new Map();
   const add = (file, language, base, extension) => {
-    const relative = path.relative(base,file).replace(extension,'').split(path.sep).map(s=>s.replaceAll('_','-')).join('/');
-    const [topic,name] = relative.split('/');
+    const raw = path.relative(base,file).replace(extension,'').split(path.sep); const topic=canonicalTopic(raw[0]),name=canonicalName(raw[1]); const relative=`${topic}/${name}`;
     const item = map.get(relative) ?? { id:relative, title:pretty(name), topic:pretty(topic), languages:[] };
     item.languages.push(language); map.set(relative,item);
   };
@@ -42,14 +44,28 @@ async function catalog() {
 function fileFor(id,language) {
   const [topic,name] = id.split('/');
   if (!topic || !name || !/^[a-z0-9-]+$/.test(topic+name)) throw new Error('Invalid problem');
-  return language==='python' ? path.join(ROOT,'python',topic.replaceAll('-','_'),`${name.replaceAll('-','_')}.py`) : path.join(ROOT,'typescript','src',topic,`${name}.ts`);
+  if(language==='python'){const pyTopic=({'1d-dp':'one_d_dp','2d-dp':'two_d_dp'}[topic]??topic.replaceAll('-','_'));return path.join(ROOT,'python',pyTopic,`${name.replaceAll('-','_')}.py`)}
+  return path.join(ROOT,'typescript','src',topic,`${name==='three-sum'?'3sum':name}.ts`);
+}
+
+function metadata(source,language){
+  const header=language==='python'?(source.match(/^"""([\s\S]*?)"""/)?.[1]??''):(source.match(/^\/\*\*([\s\S]*?)\*\//)?.[1]??'');
+  const lines=header.split('\n').map(line=>line.replace(/^\s*\*?\s?/,'').trimEnd()); const titleLine=lines.find(line=>/^LeetCode\s+/i.test(line))??''; const match=titleLine.match(/^LeetCode\s+(\d+)\.\s+(.+?)\s+\((Easy|Medium|Hard)\)$/i); const url=lines.find(line=>/^https?:\/\//.test(line))??''; const urlIndex=lines.indexOf(url); const description=lines.slice(urlIndex+1).filter(line=>line&&!/^Run (just|its|everything)/i.test(line)).join(' ').replace(/\s+/g,' ').trim();
+  return{number:match?.[1]??'',title:match?.[2]??'',difficulty:match?.[3]??'Practice',url,description};
+}
+
+function exampleTests(source,language){
+  const examples=[];
+  if(language==='python'){const pattern=/def (test_[^(]+)\(\):\n([\s\S]*?)(?=\n\ndef test_|\n\nif __name__|$)/g;let match;while((match=pattern.exec(source))&&examples.length<5)examples.push({name:pretty(match[1].replace(/^test_/,'')),code:match[2].split('\n').map(line=>line.replace(/^    /,'')).join('\n').trim().slice(0,700)})}
+  else {const parts=source.split(/\n\s*it\(/).slice(1,6);for(const part of parts){const name=part.match(/^['"]([^'"]+)/)?.[1]??'Test case';const body=part.slice(part.indexOf('=>')+2).replace(/^\s*\{\s*/,'').replace(/\}\);[\s\S]*$/,'').trim();examples.push({name,code:body.slice(0,700)})}}
+  return examples;
 }
 
 async function detail(id) {
   const item=(await catalog()).find(problem=>problem.id===id); if(!item) throw new Error('Problem not found');
-  const code={},tests={};
-  for(const language of item.languages){const file=fileFor(id,language);const full=await fs.readFile(file,'utf8');code[language]=language==='python'&&full.includes(testMarker)?full.split(testMarker)[0].trimEnd()+'\n':full; if(language==='python'){tests[language]=`${(full.match(/^def test_/gm)||[]).length} local test cases`}else{const testFile=file.replace(/\.ts$/,'.test.ts');try{const text=await fs.readFile(testFile,'utf8');tests[language]=`${(text.match(/\bit\s*\(/g)||[]).length} local test cases`}catch{tests[language]='No test file yet'}}}
-  return {...item,description:`Implement ${item.title} in ${item.languages.length===2?'Python or TypeScript':pretty(item.languages[0])}. Use the local examples and edge cases to guide your solution, then run the focused test suite from this page.`,code,tests};
+  const code={},tests={};let meta=null,examples=[];
+  for(const language of item.languages){const file=fileFor(id,language);const full=await fs.readFile(file,'utf8');const currentMeta=metadata(full,language);if(!meta||currentMeta.description.length>meta.description.length)meta=currentMeta;code[language]=language==='python'&&full.includes(testMarker)?full.split(testMarker)[0].trimEnd()+'\n':full; if(language==='python'){tests[language]=`${(full.match(/^def test_/gm)||[]).length} local test cases`;if(!examples.length)examples=exampleTests(full,language)}else{const testFile=file.replace(/\.ts$/,'.test.ts');try{const text=await fs.readFile(testFile,'utf8');tests[language]=`${(text.match(/\bit\s*\(/g)||[]).length} local test cases`;examples=exampleTests(text,language)}catch{tests[language]='No test file yet'}}}
+  return {...item,...meta,title:meta?.title||item.title,description:meta?.description||`Implement ${item.title} and make every local test pass.`,code,tests,examples};
 }
 
 async function saveAndRun({id,language,code,action='test'}) {
