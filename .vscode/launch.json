@@ -1,0 +1,45 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Python: debug current file",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${file}",
+      "console": "integratedTerminal",
+      "python": "${workspaceFolder}/python/.venv/bin/python",
+      "justMyCode": true
+    },
+    {
+      "name": "Python: debug tests in current file",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "args": ["${file}", "-v"],
+      "cwd": "${workspaceFolder}/python",
+      "console": "integratedTerminal",
+      "python": "${workspaceFolder}/python/.venv/bin/python",
+      "justMyCode": true
+    },
+    {
+      "name": "TypeScript: debug current file (tsx)",
+      "type": "node",
+      "request": "launch",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["tsx", "${file}"],
+      "cwd": "${workspaceFolder}/typescript",
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**"]
+    },
+    {
+      "name": "TypeScript: debug tests in current file (vitest)",
+      "type": "node",
+      "request": "launch",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["vitest", "run", "${file}"],
+      "cwd": "${workspaceFolder}/typescript",
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**"]
+    }
+  ]
+}

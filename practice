@@ -1,0 +1,94 @@
+#!/usr/bin/env python3
+"""Small local runner for the NeetCode practice workspace."""
+
+from __future__ import annotations
+
+import argparse
+import subprocess
+import sys
+from pathlib import Path
+
+
+ROOT = Path(__file__).resolve().parent
+PYTHON = ROOT / "python" / ".venv" / "bin" / "python"
+TS_ROOT = ROOT / "typescript"
+
+
+def problems(language: str) -> list[Path]:
+    if language == "python":
+        return sorted(
+            path
+            for path in (ROOT / "python").glob("*/*.py")
+            if path.name != "helpers.py"
+        )
+    return sorted(
+        path
+        for path in (TS_ROOT / "src").glob("*/*.ts")
+        if not path.name.endswith(".test.ts") and path.name != "helpers.ts"
+    )
+
+
+def slug(path: Path, language: str) -> str:
+    base = ROOT / "python" if language == "python" else TS_ROOT / "src"
+    value = path.relative_to(base).with_suffix("").as_posix()
+    return value.replace("_", "-") if language == "python" else value
+
+
+def is_started(path: Path) -> bool:
+    text = path.read_text()
+    return "TODO: implement" not in text and "Not implemented" not in text and "\n        pass\n" not in text
+
+
+def resolve(language: str, name: str) -> Path:
+    normalized = name.removesuffix(".py").removesuffix(".ts").replace("_", "-")
+    matches = [p for p in problems(language) if slug(p, language) == normalized or slug(p, language).endswith(f"/{normalized}")]
+    if len(matches) == 1:
+        return matches[0]
+    if not matches:
+        raise SystemExit(f"Unknown {language} problem: {name}. Try './practice list {language}'.")
+    choices = "\n  ".join(slug(p, language) for p in matches)
+    raise SystemExit(f"Ambiguous problem name; use a topic too:\n  {choices}")
+
+
+def run(command: list[str], cwd: Path) -> None:
+    raise SystemExit(subprocess.run(command, cwd=cwd).returncode)
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="List, run, or test local DSA exercises.")
+    sub = parser.add_subparsers(dest="command", required=True)
+
+    listing = sub.add_parser("list", help="show exercises and progress")
+    listing.add_argument("language", nargs="?", choices=("python", "typescript"))
+    listing.add_argument("--todo", action="store_true", help="only show untouched exercises")
+
+    for command in ("run", "test"):
+        action = sub.add_parser(command, help=f"{command} one exercise")
+        action.add_argument("language", choices=("python", "typescript", "py", "ts"))
+        action.add_argument("problem", help="problem slug, optionally topic/problem")
+
+    args = parser.parse_args()
+    if args.command == "list":
+        languages = [args.language] if args.language else ["python", "typescript"]
+        for language in languages:
+            items = problems(language)
+            started = sum(is_started(p) for p in items)
+            print(f"{language}: {started}/{len(items)} started")
+            for path in items:
+                if args.todo and is_started(path):
+                    continue
+                print(f"  {'✓' if is_started(path) else '○'} {slug(path, language)}")
+        return
+
+    language = {"py": "python", "ts": "typescript"}.get(args.language, args.language)
+    path = resolve(language, args.problem)
+    if language == "python":
+        command = [str(PYTHON), str(path)] if args.command == "run" else [str(PYTHON), "-m", "pytest", str(path), "-v"]
+        run(command, ROOT / "python")
+    relative = path.relative_to(TS_ROOT)
+    command = ["npm", "run", "run", "--", str(relative)] if args.command == "run" else ["npm", "run", "test:one", "--", str(relative.with_suffix(".test.ts"))]
+    run(command, TS_ROOT)
+
+
+if __name__ == "__main__":
+    main()
