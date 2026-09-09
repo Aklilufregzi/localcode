@@ -2,17 +2,6 @@ name: Desktop installers
 
 on:
   workflow_dispatch:
-    inputs:
-      platform:
-        description: Platform to build
-        required: true
-        default: all
-        type: choice
-        options:
-          - all
-          - macos
-          - windows
-          - linux
   push:
     tags:
       - "v*"
@@ -27,18 +16,14 @@ jobs:
       matrix:
         include:
           - os: macos-14
-            platform: macos
             artifact: localquest-macos
             bundles: dmg
           - os: windows-2022
-            platform: windows
             artifact: localquest-windows
             bundles: nsis,msi
           - os: ubuntu-22.04
-            platform: linux
             artifact: localquest-linux
             bundles: deb
-    if: inputs.platform == '' || inputs.platform == 'all' || inputs.platform == matrix.platform
     runs-on: ${{ matrix.os }}
     defaults:
       run:
