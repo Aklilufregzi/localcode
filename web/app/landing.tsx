@@ -4,7 +4,7 @@ import './landing.css';
 import './landing-motion.css';
 import Image from 'next/image';
 
-const releaseBase='/downloads';
+const releaseBase='https://github.com/Aklilufregzi/localcode/releases/download/v0.1.0';
 
 const downloads=[
   {platform:'macOS',icon:'⌘',chip:'Apple silicon',file:'LocalQuest_0.1.0_aarch64.dmg',detail:'macOS 12 or later · 86 MB installer',tone:'mac',available:true},

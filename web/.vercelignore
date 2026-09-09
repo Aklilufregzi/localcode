@@ -8,6 +8,7 @@ desktop
 src
 scripts
 runner.mjs
+public/downloads
 .env
 .env.*
 *.log
