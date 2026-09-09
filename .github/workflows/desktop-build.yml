@@ -56,7 +56,14 @@ jobs:
         run: npm ci
         working-directory: typescript
 
+      - name: Build native installer (macOS)
+        if: runner.os == 'macOS'
+        env:
+          APPLE_SIGNING_IDENTITY: "-"
+        run: npm run tauri:build -- --bundles ${{ matrix.bundles }}
+
       - name: Build native installer
+        if: runner.os != 'macOS'
         run: npm run tauri:build -- --bundles ${{ matrix.bundles }}
 
       - name: Upload installers
