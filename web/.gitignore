@@ -45,4 +45,6 @@ next-env.d.ts
 /public/downloads/*.msi
 /public/downloads/*.AppImage
 /public/downloads/*.deb
+/public/downloads/windows/
+/public/downloads/linux/
 /supabase/.temp/

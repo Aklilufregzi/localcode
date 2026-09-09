@@ -8,8 +8,8 @@ const releaseBase='/downloads';
 
 const downloads=[
   {platform:'macOS',icon:'⌘',chip:'Apple silicon',file:'LocalQuest_0.1.0_aarch64.dmg',detail:'macOS 12 or later · 86 MB installer',tone:'mac',available:true},
-  {platform:'Windows',icon:'⊞',chip:'64-bit',file:'LocalQuest_0.1.0_x64-setup.exe',detail:'Windows 10 or later · x64',tone:'win',available:false},
-  {platform:'Linux',icon:'◆',chip:'AppImage',file:'LocalQuest_0.1.0_amd64.AppImage',detail:'Ubuntu 22.04+ and compatible distros',tone:'linux',available:false},
+  {platform:'Windows',icon:'⊞',chip:'64-bit',file:'LocalQuest_0.1.0_x64-setup.exe',detail:'Windows 10 or later · 47 MB installer',tone:'win',available:true},
+  {platform:'Linux',icon:'◆',chip:'Debian',file:'LocalQuest_0.1.0_amd64.deb',detail:'Ubuntu 22.04+ and Debian-based distros · 99 MB',tone:'linux',available:true},
 ];
 
 export function Landing(){
