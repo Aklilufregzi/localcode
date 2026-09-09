@@ -1,0 +1,52 @@
+{
+  "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
+  "productName": "LocalQuest",
+  "version": "0.1.0",
+  "identifier": "dev.localquest.desktop",
+  "build": {
+    "frontendDist": "../dist-tauri",
+    "devUrl": "http://localhost:1420",
+    "beforeDevCommand": "npm run tauri:web:dev",
+    "beforeBuildCommand": "npm run tauri:web:build"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "LocalQuest",
+        "width": 1500,
+        "height": 940,
+        "minWidth": 1050,
+        "minHeight": 700,
+        "resizable": true,
+        "fullscreen": false
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self' customprotocol: asset:; connect-src 'self' ipc: http://ipc.localhost http://127.0.0.1:4311 https://*.supabase.co wss://*.supabase.co; img-src 'self' asset: data: blob:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; script-src 'self' 'unsafe-eval'; worker-src 'self' blob:"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "category": "Education",
+    "resources": {
+      "../runner.mjs": "runner.mjs",
+      "../../python": "practice/python",
+      "../../typescript/src": "practice/typescript/src",
+      "../../typescript/package.json": "practice/typescript/package.json",
+      "../../typescript/tsconfig.json": "practice/typescript/tsconfig.json",
+      "../../typescript/node_modules": "typescript-runtime/node_modules",
+      "runtime": "runtime"
+    },
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "android": {
+      "debugApplicationIdSuffix": ".debug"
+    }
+  }
+}

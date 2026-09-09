@@ -1,0 +1,143 @@
+@keyframes landing-fade-up {
+  from { opacity: 0; transform: translateY(24px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes landing-window-in {
+  from { opacity: 0; transform: perspective(1200px) rotateY(-8deg) translateX(36px) scale(.96); }
+  to { opacity: 1; transform: perspective(1200px) rotateY(-3deg) translateX(0) scale(1); }
+}
+
+@keyframes landing-float {
+  0%, 100% { transform: perspective(1200px) rotateY(-3deg) translateY(0); }
+  50% { transform: perspective(1200px) rotateY(-2deg) translateY(-8px); }
+}
+
+@keyframes landing-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 #68f0a400; }
+  50% { box-shadow: 0 0 0 7px #68f0a412; }
+}
+
+@keyframes landing-shimmer {
+  from { transform: translateX(-140%) skewX(-18deg); }
+  to { transform: translateX(360%) skewX(-18deg); }
+}
+
+@keyframes landing-reveal {
+  from { opacity: .18; transform: translateY(36px) scale(.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.landing-nav {
+  animation: landing-fade-up .55s ease-out both;
+}
+
+.hero-copy .eyebrow { animation: landing-fade-up .55s .08s ease-out both; }
+.hero-copy h1 { animation: landing-fade-up .65s .16s cubic-bezier(.2,.75,.25,1) both; }
+.hero-copy > p { animation: landing-fade-up .6s .25s ease-out both; }
+.hero-actions { animation: landing-fade-up .6s .33s ease-out both; }
+.hero-proof { animation: landing-fade-up .6s .41s ease-out both; }
+
+.product-window {
+  animation: landing-window-in .85s .18s cubic-bezier(.16,.8,.24,1) both,
+             landing-float 6s 1.1s ease-in-out infinite;
+  will-change: transform;
+}
+
+.product-window .fake-code aside {
+  animation: landing-pulse 2.8s ease-in-out infinite;
+}
+
+.primary-download {
+  position: relative;
+  overflow: hidden;
+  transition: transform .2s ease, box-shadow .2s ease;
+}
+
+.primary-download::after {
+  content: '';
+  position: absolute;
+  inset: -40% auto -40% 0;
+  width: 38%;
+  background: linear-gradient(90deg, transparent, #fff8, transparent);
+  animation: landing-shimmer 3.8s 1.2s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.landing-nav a,
+.download-grid a,
+.landing-footer a {
+  transition: color .2s ease, border-color .2s ease, transform .2s ease;
+}
+
+.landing-nav a:hover,
+.landing-footer > a:last-child:hover { color: var(--lime); }
+
+.stats,
+.feature-section .section-heading,
+.download-section .section-heading,
+.local-story {
+  animation: landing-reveal linear both;
+  animation-timeline: view();
+  animation-range: entry 8% cover 32%;
+}
+
+.feature-grid article,
+.download-grid article {
+  animation: landing-reveal linear both;
+  animation-timeline: view();
+  animation-range: entry 4% cover 25%;
+  transition: transform .24s ease, border-color .24s ease, box-shadow .24s ease;
+}
+
+.feature-grid article:nth-child(2),
+.feature-grid article:nth-child(5),
+.download-grid article:nth-child(2) { animation-range: entry 9% cover 30%; }
+
+.feature-grid article:nth-child(3),
+.feature-grid article:nth-child(6),
+.download-grid article:nth-child(3) { animation-range: entry 14% cover 35%; }
+
+.feature-grid article:hover {
+  transform: translateY(-6px);
+  border-color: #4a7c66;
+  box-shadow: 0 18px 45px #0004;
+}
+
+.download-grid article:hover {
+  transform: translateY(-7px);
+  box-shadow: 0 18px 40px #19332618;
+}
+
+.download-grid article:hover a { transform: translateX(3px); }
+
+.download-unavailable {
+  display: inline-flex;
+  margin-top: 18px;
+  padding: 11px 14px;
+  border: 1px dashed #b7c5bc;
+  border-radius: 8px;
+  color: #718078;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: not-allowed;
+}
+
+.flow span {
+  transition: transform .2s ease, border-color .2s ease, background .2s ease;
+}
+
+.flow span:hover {
+  transform: translateY(-3px);
+  border-color: var(--lime);
+  background: #143326;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing *, .landing *::before, .landing *::after {
+    scroll-behavior: auto !important;
+    animation-duration: .001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .001ms !important;
+  }
+}

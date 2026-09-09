@@ -13,8 +13,12 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'localcode — DSA practice',
-  description: 'Run and debug Python and TypeScript DSA exercises locally.',
+  title: 'LocalQuest — Practice algorithms locally',
+  description: 'A local-first DSA training app with Python, TypeScript, full test suites, and a private AI coding coach.',
+  icons: {
+    icon: '/favicon.svg',
+    apple: '/localquest-app-icon.png',
+  },
 };
 
 export default function RootLayout({

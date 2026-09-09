@@ -34,6 +34,15 @@ yarn-error.log*
 .vercel
 next-env.d.ts
 /dist/
+/dist-tauri/
+/src-tauri/runtime/
+*.tsbuildinfo
 /.wrangler/
 /outputs/
 /work/
+/public/downloads/*.dmg
+/public/downloads/*.exe
+/public/downloads/*.msi
+/public/downloads/*.AppImage
+/public/downloads/*.deb
+/supabase/.temp/

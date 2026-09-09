@@ -3,12 +3,11 @@ import { execFile } from 'node:child_process';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { promisify } from 'node:util';
-import Anthropic from '@anthropic-ai/sdk';
 
 const exec = promisify(execFile);
 const WEB = path.dirname(new URL(import.meta.url).pathname);
-const ROOT = path.resolve(WEB, '..');
-const PORT = 4311;
+const ROOT = process.env.LOCALQUEST_ROOT || path.resolve(WEB, '..');
+const PORT = Number(process.env.LOCALQUEST_RUNNER_PORT || 4311);
 const PROGRESS_FILE = path.join(ROOT,'.localcode-progress.json');
 const testMarker = '# ---------------------------- tests ----------------------------';
 const topicNames={'1d-dp':'1-D Dynamic Programming','2d-dp':'2-D Dynamic Programming','advanced-graphs':'Advanced Graphs','arrays-hashing':'Arrays & Hashing','binary-search':'Binary Search','bit-manipulation':'Bit Manipulation','linked-list':'Linked List','math-geometry':'Math & Geometry','sliding-window':'Sliding Window','two-pointers':'Two Pointers'};
@@ -16,6 +15,18 @@ const pretty = value => topicNames[value]??value.split(/[-_]/).map(word => word 
 const canonicalTopic = value => ({one_d_dp:'1d-dp',two_d_dp:'2d-dp'}[value]??value.replaceAll('_','-'));
 const canonicalName = value => value.replaceAll('_','-')==='3sum'?'three-sum':value.replaceAll('_','-');
 const reviewCache = new Map();
+const solutionCache = new Map();
+const OLLAMA_URL=(process.env.OLLAMA_URL||'http://127.0.0.1:11434').replace(/\/$/,'');
+const OLLAMA_MODEL=process.env.OLLAMA_MODEL||'qwen2.5-coder:1.5b';
+
+async function ollamaJson(system,content,maxTokens=1600){
+  let response;
+  try{response=await fetch(`${OLLAMA_URL}/api/chat`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({model:OLLAMA_MODEL,stream:false,format:'json',options:{temperature:.65,num_predict:maxTokens},messages:[{role:'system',content},{role:'user',content:system}]})})}
+  catch{throw new Error('Byte is offline. Finish Local AI setup and make sure Ollama is running.')}
+  const payload=await response.json().catch(()=>({}));
+  if(!response.ok)throw new Error(payload.error||`Local AI failed (${response.status}).`);
+  try{return JSON.parse(payload.message?.content??'')}catch{throw new Error('Byte returned an unreadable local response. Try again after your next edit.')}
+}
 
 async function walk(base, extension) {
   const found = [];
@@ -38,7 +49,10 @@ async function catalog() {
   };
   for (const file of await walk(path.join(ROOT,'python'),'.py')) add(file,'python',path.join(ROOT,'python'),'.py');
   for (const file of await walk(path.join(ROOT,'typescript','src'),'.ts')) add(file,'typescript',path.join(ROOT,'typescript','src'),'.ts');
-  return [...map.values()].map(item=>({...item,completed:Object.keys(progress[item.id]??{}).filter(language=>progress[item.id][language])})).sort((a,b)=>a.topic.localeCompare(b.topic)||a.title.localeCompare(b.title));
+  const items=[...map.values()];
+  await Promise.all(items.map(async item=>{try{const language=item.languages.includes('python')?'python':item.languages[0];const source=await fs.readFile(fileFor(item.id,language),'utf8');item.difficulty=metadata(source,language).difficulty}catch{item.difficulty='Practice'}}));
+  const rank={Easy:0,Practice:1,Medium:2,Hard:3};
+  return items.map(item=>({...item,completed:Object.keys(progress[item.id]??{}).filter(language=>progress[item.id][language])})).sort((a,b)=>a.topic.localeCompare(b.topic)||(rank[a.difficulty]??1)-(rank[b.difficulty]??1)||a.title.localeCompare(b.title));
 }
 
 function fileFor(id,language) {
@@ -78,33 +92,36 @@ async function saveAndRun({id,language,code,action='test'}) {
     if(action==='run'||action==='debug') {
       const debugging=action==='debug';
       result=language==='python'
-        ? await exec(path.join(ROOT,'python','.venv','bin','python'),[...(debugging?['-X','dev','-u']:[]),file],{cwd:path.join(ROOT,'python'),timeout:15000,maxBuffer:1024*1024,env:{...process.env,...(debugging?{PYTHONFAULTHANDLER:'1',DEBUG:'1'}:{})}})
-        : await exec(path.join(ROOT,'typescript','node_modules','.bin','tsx'),[file],{cwd:path.join(ROOT,'typescript'),timeout:15000,maxBuffer:1024*1024,env:{...process.env,...(debugging?{NODE_OPTIONS:`${process.env.NODE_OPTIONS??''} --enable-source-maps`.trim(),DEBUG:'1'}:{})}});
+        ? await exec(process.env.LOCALQUEST_PYTHON||path.join(ROOT,'python','.venv','bin','python'),[...(debugging?['-X','dev','-u']:[]),file],{cwd:path.join(ROOT,'python'),timeout:15000,maxBuffer:1024*1024,env:{...process.env,...(debugging?{PYTHONFAULTHANDLER:'1',DEBUG:'1'}:{})}})
+        : process.env.LOCALQUEST_TSX
+          ? await exec(process.env.LOCALQUEST_NODE||process.execPath,[process.env.LOCALQUEST_TSX,file],{cwd:path.join(ROOT,'typescript'),timeout:15000,maxBuffer:1024*1024,env:{...process.env,...(debugging?{NODE_OPTIONS:`${process.env.NODE_OPTIONS??''} --enable-source-maps`.trim(),DEBUG:'1'}:{})}})
+          : await exec(path.join(ROOT,'typescript','node_modules','.bin','tsx'),[file],{cwd:path.join(ROOT,'typescript'),timeout:15000,maxBuffer:1024*1024,env:{...process.env,...(debugging?{NODE_OPTIONS:`${process.env.NODE_OPTIONS??''} --enable-source-maps`.trim(),DEBUG:'1'}:{})}});
     }
-    else if(language==='python') result=await exec(path.join(ROOT,'python','.venv','bin','python'),['-m','pytest',file,'-v'],{cwd:path.join(ROOT,'python'),timeout:15000,maxBuffer:1024*1024});
-    else {const testFile=file.replace(/\.ts$/,'.test.ts');await fs.access(testFile);result=await exec('npm',['run','test:one','--',path.relative(path.join(ROOT,'typescript'),testFile)],{cwd:path.join(ROOT,'typescript'),timeout:15000,maxBuffer:1024*1024})}
+    else if(language==='python') result=await exec(process.env.LOCALQUEST_PYTHON||path.join(ROOT,'python','.venv','bin','python'),['-m','pytest',file,'-v'],{cwd:path.join(ROOT,'python'),timeout:15000,maxBuffer:1024*1024});
+    else {const testFile=file.replace(/\.ts$/,'.test.ts');await fs.access(testFile);result=process.env.LOCALQUEST_VITEST?await exec(process.env.LOCALQUEST_NODE||process.execPath,[process.env.LOCALQUEST_VITEST,'run',testFile],{cwd:path.join(ROOT,'typescript'),timeout:15000,maxBuffer:1024*1024}):await exec('npm',['run','test:one','--',path.relative(path.join(ROOT,'typescript'),testFile)],{cwd:path.join(ROOT,'typescript'),timeout:15000,maxBuffer:1024*1024})}
     if(action==='submit'){let progress={};try{progress=JSON.parse(await fs.readFile(PROGRESS_FILE,'utf8'))}catch{};progress[id]={...(progress[id]??{}),[language]:true};await fs.writeFile(PROGRESS_FILE,JSON.stringify(progress,null,2)+'\n')}
     return{passed:true,submitted:action==='submit',output:`${action==='submit'?'✓ Accepted\n\n':''}${result.stdout}${result.stderr}`};
   }catch(error){return{passed:false,submitted:false,output:`${error.stdout??''}${error.stderr??''}`||error.message}}
 }
 
 async function reviewCode({id,language,code}) {
-  if (!process.env.ANTHROPIC_API_KEY) throw new Error('Add ANTHROPIC_API_KEY to web/.env, then restart the dev server.');
   if (typeof code!=='string'||code.length>30000) throw new Error('Code is too large to review.');
   const item=(await catalog()).find(p=>p.id===id&&p.languages.includes(language)); if(!item) throw new Error('Invalid problem.');
   const key=`${id}:${language}:${code}`; if(reviewCache.has(key)) return reviewCache.get(key);
-  const client=new Anthropic({apiKey:process.env.ANTHROPIC_API_KEY});
-  const message=await client.messages.create({
-    model:process.env.ANTHROPIC_MODEL||'claude-haiku-4-5-20251001', max_tokens:1400,
-    system:'You are Byte, the user’s chaotic coding best friend—not a formal reviewer. Sound warm, spontaneous, funny, and conversational. Use playful roasts, tiny celebrations, occasional dramatic reactions, and programmer humor. Never insult the person or sound corporate. Review every non-empty line that merits feedback. Praise correct, clear, or efficient work; roast bugs, needless complexity, unclear naming, and suspicious choices. Stay technically precise and concise. Do not reveal a complete solution. Vary your phrasing so you feel alive. Return ONLY valid JSON: {"summary":"...","comments":[{"line":1,"kind":"praise|roast|tip","message":"..."}]}. Line numbers must match the submitted code.',
-    messages:[{role:'user',content:`Problem: ${item.title}\nLanguage: ${language}\n\nCode with line numbers:\n${code.split('\n').map((line,index)=>`${index+1}: ${line}`).join('\n')}`}]
-  });
-  const text=message.content.filter(block=>block.type==='text').map(block=>block.text).join('');
-  let parsed; try{parsed=JSON.parse(text.replace(/^```json\s*|\s*```$/g,''))}catch{throw new Error('The AI reviewer returned an unreadable response. Try again after your next edit.')}
+  const parsed=await ollamaJson(`Problem: ${item.title}\nLanguage: ${language}\n\nCode with line numbers:\n${code.split('\n').map((line,index)=>`${index+1}: ${line}`).join('\n')}`,'You are Byte, the user’s chaotic coding best friend, not a formal reviewer. Use playful roasts and tiny celebrations, never insult the person. Be technically precise and concise. Do not reveal a complete solution. Return ONLY JSON: {"summary":"...","comments":[{"line":1,"kind":"praise|roast|tip","message":"..."}]}. Line numbers must match the code.',1400);
   const result={summary:String(parsed.summary??''),comments:Array.isArray(parsed.comments)?parsed.comments.filter(c=>Number.isInteger(c.line)&&['praise','roast','tip'].includes(c.kind)).slice(0,60):[]};
   reviewCache.set(key,result); if(reviewCache.size>50)reviewCache.delete(reviewCache.keys().next().value); return result;
 }
 
-const server=createServer(async(req,res)=>{res.setHeader('Access-Control-Allow-Origin','http://localhost:3000');res.setHeader('Access-Control-Allow-Headers','content-type');if(req.method==='OPTIONS'){res.writeHead(204);return res.end()}try{if(req.method==='GET'&&req.url==='/api/problems')return json(res,200,await catalog());if(req.method==='GET'&&req.url.startsWith('/api/problems/'))return json(res,200,await detail(decodeURIComponent(req.url.slice(14))));if(req.method==='POST'&&(req.url==='/api/run'||req.url==='/api/review')){let body='';for await(const chunk of req){body+=chunk;if(body.length>250000)throw new Error('Request too large')}const input=JSON.parse(body);return json(res,200,req.url==='/api/review'?await reviewCode(input):await saveAndRun(input))}json(res,404,{error:'Not found'})}catch(error){json(res,400,{error:error.message,output:error.message})}});
+async function solutionSteps({id,language,code}) {
+  const item=(await catalog()).find(p=>p.id===id&&p.languages.includes(language)); if(!item) throw new Error('Invalid problem.');
+  const problem=await detail(id); const key=`${id}:${language}`; if(solutionCache.has(key)) return solutionCache.get(key);
+  const parsed=await ollamaJson(`Problem: ${problem.title}\nDescription: ${problem.description}\nLanguage: ${language}\nLocal examples: ${JSON.stringify(problem.examples??[])}\nCurrent starter/attempt:\n${String(code??problem.code[language]??'').slice(0,30000)}`,'Create an accurate DSA walkthrough. Return ONLY JSON: {"steps":[{"title":"...","explanation":"...","code":"..."}]}. Produce 3 to 6 cumulative steps. Every code field is the complete runnable source at that stage and preserves the signature. Finish with the optimal solution. Keep explanations friendly and under 45 words. No Markdown fences.',5000);
+  const steps=Array.isArray(parsed.steps)?parsed.steps.filter(step=>typeof step?.title==='string'&&typeof step?.explanation==='string'&&typeof step?.code==='string').slice(0,7).map(step=>({title:step.title.slice(0,100),explanation:step.explanation.slice(0,500),code:step.code.slice(0,100000)})):[];
+  if(steps.length<2)throw new Error('Byte did not return enough solution steps. Try again.');
+  const result={steps};solutionCache.set(key,result);if(solutionCache.size>100)solutionCache.delete(solutionCache.keys().next().value);return result;
+}
+
+const server=createServer(async(req,res)=>{const origin=req.headers.origin??'';if(/^https?:\/\/(?:localhost|127\.0\.0\.1)(?::\d+)?$/.test(origin)||origin==='tauri://localhost'||origin==='http://tauri.localhost'||origin==='https://tauri.localhost')res.setHeader('Access-Control-Allow-Origin',origin);res.setHeader('Vary','Origin');res.setHeader('Access-Control-Allow-Headers','content-type');if(req.method==='OPTIONS'){res.writeHead(204);return res.end()}try{if(req.method==='GET'&&req.url==='/api/problems')return json(res,200,await catalog());if(req.method==='GET'&&req.url.startsWith('/api/problems/'))return json(res,200,await detail(decodeURIComponent(req.url.slice(14))));if(req.method==='POST'&&['/api/run','/api/review','/api/solution'].includes(req.url)){let body='';for await(const chunk of req){body+=chunk;if(body.length>250000)throw new Error('Request too large')}const input=JSON.parse(body);return json(res,200,req.url==='/api/review'?await reviewCode(input):req.url==='/api/solution'?await solutionSteps(input):await saveAndRun(input))}json(res,404,{error:'Not found'})}catch(error){json(res,400,{error:error.message,output:error.message})}});
 function json(res,status,value){res.writeHead(status,{'content-type':'application/json'});res.end(JSON.stringify(value))}
 server.listen(PORT,'127.0.0.1',()=>console.log(`Local code runner: http://localhost:${PORT}`));
